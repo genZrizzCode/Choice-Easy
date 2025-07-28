@@ -12,6 +12,7 @@
     "@expo-google-fonts/rampart-one": "^0.4.0",
     "@expo/metro-runtime": "~5.0.4",
     "@expo/vector-icons": "^14.1.0",
+    "@react-native-community/hooks": "^100.1.0",
     "axios": "^1.11.0",
     "cheerio": "^1.1.2",
     "expo": "~53.0.20",

@@ -8,12 +8,14 @@ import {
   ScrollView,
   Alert,
   Platform,
+  Appearance,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
 import { CustomAI, ChoiceEvaluation } from './services/customAI';
 import * as Font from 'expo-font';
 import { RampartOne_400Regular } from '@expo-google-fonts/rampart-one';
+
 
 interface Choice {
   id: number;
@@ -30,6 +32,10 @@ export default function App() {
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [showActivityPicker, setShowActivityPicker] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean | null>(null);
+  const [isQuickMode, setIsQuickMode] = useState(false);
+  const systemColorScheme = Appearance.getColorScheme();
 
   useEffect(() => {
     async function loadFonts() {
@@ -123,6 +129,93 @@ export default function App() {
     setCurrentInput('');
     setSelectedChoice(null);
     setShowResult(false);
+    setShowActivityPicker(false);
+  };
+
+  const toggleDarkMode = () => {
+    if (isDarkMode === null) {
+      // If using system preference, switch to opposite of system
+      setIsDarkMode(systemColorScheme === 'light');
+    } else {
+      // If manual mode, just toggle
+      setIsDarkMode(!isDarkMode);
+    }
+  };
+
+  const generateQuickChoice = async () => {
+    setIsProcessing(true);
+    try {
+      // Generate a random safe choice
+      const randomActivity = preMadeActivities[Math.floor(Math.random() * preMadeActivities.length)];
+      
+      // Evaluate it with AI
+      const evaluation = await CustomAI.evaluateChoices([randomActivity]);
+      
+      if (evaluation[0].isGood) {
+        setSelectedChoice(randomActivity);
+        setShowResult(true);
+        setIsQuickMode(true);
+      } else {
+        // If not good, try again
+        generateQuickChoice();
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to generate choice. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Use system preference as default, but allow manual override
+  const actualDarkMode = isDarkMode !== null ? isDarkMode : systemColorScheme === 'dark';
+
+  const preMadeActivities = [
+    'Go for a walk',
+    'Read a book',
+    'Call a friend',
+    'Cook a meal',
+    'Watch a movie',
+    'Listen to music',
+    'Take a nap',
+    'Exercise',
+    'Write in a journal',
+    'Learn something new',
+    'Visit a museum',
+    'Try a new restaurant',
+    'Go to the park',
+    'Take photos',
+    'Play a game',
+    'Meditate',
+    'Draw or paint',
+    'Clean your space',
+    'Plan a trip',
+    'Volunteer',
+    'Go shopping',
+    'Visit family',
+    'Try a new hobby',
+    'Go to the gym',
+    'Watch the sunset',
+    'Write a letter',
+    'Learn to cook',
+    'Go hiking',
+    'Visit a library',
+    'Start a project'
+  ];
+
+  const addRandomActivity = () => {
+    if (choices.length >= 7) {
+      Alert.alert('Error', 'You can only have 7 choices');
+      return;
+    }
+
+    const randomActivity = preMadeActivities[Math.floor(Math.random() * preMadeActivities.length)];
+    const newChoice: Choice = {
+      id: Date.now(),
+      text: randomActivity,
+      isGood: null,
+    };
+
+    setChoices([...choices, newChoice]);
   };
 
   const getStatusColor = (isGood: boolean | null) => {
@@ -144,26 +237,41 @@ export default function App() {
   }
 
   return (
-    <View style={[styles.container, { pointerEvents: 'auto' }]}>
-      <StatusBar style="auto" />
+    <View style={[actualDarkMode ? styles.containerDark : styles.container, { pointerEvents: 'auto' }]}>
+      <StatusBar style={actualDarkMode ? 'light' : 'auto'} />
       
-      <View style={styles.header}>
-        <Text style={styles.title}>ChoiceEasy</Text>
-        <Text style={styles.subtitle}>AI-Powered Decision Maker</Text>
+      <View style={[styles.header, actualDarkMode && styles.headerDark]}>
+        <View style={styles.headerContent}>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>ChoiceEasy</Text>
+            <Text style={styles.subtitle}>AI-Powered Decision Maker</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.darkModeToggle}
+            onPress={toggleDarkMode}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons 
+              name={actualDarkMode ? 'light-mode' : 'dark-mode'} 
+              size={24} 
+              color="white" 
+            />
+          </TouchableOpacity>
       </View>
+    </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Input Section */}
-        <View style={styles.inputSection}>
-          <Text style={styles.sectionTitle}>Add Your Choices ({choices.length}/7)</Text>
+              <ScrollView style={[styles.content, actualDarkMode && styles.contentDark]} showsVerticalScrollIndicator={false}>
+          {/* Input Section */}
+          <View style={styles.inputSection}>
+            <Text style={[styles.sectionTitle, actualDarkMode && styles.sectionTitleDark]}>Add Your Choices ({choices.length}/7)</Text>
           
           <View style={styles.inputContainer}>
             <TextInput
-              style={styles.input}
+              style={[styles.input, actualDarkMode && styles.inputDark]}
               value={currentInput}
               onChangeText={setCurrentInput}
               placeholder="Enter a choice..."
-              placeholderTextColor="#999"
+              placeholderTextColor={actualDarkMode ? "#666" : "#999"}
               onSubmitEditing={addChoice}
             />
             <TouchableOpacity
@@ -175,17 +283,28 @@ export default function App() {
               <MaterialIcons name="add" size={24} color="white" />
             </TouchableOpacity>
           </View>
+          
+          {/* Random Activity Button */}
+          <TouchableOpacity
+            style={[styles.randomActivityButton, choices.length >= 7 && styles.disabledButton]}
+            onPress={addRandomActivity}
+            disabled={choices.length >= 7}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="casino" size={20} color="white" />
+            <Text style={styles.randomActivityText}>Add Random Activity</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Choices List */}
         {choices.length > 0 && (
           <View style={styles.choicesSection}>
-            <Text style={styles.sectionTitle}>Your Choices</Text>
+            <Text style={[styles.sectionTitle, actualDarkMode && styles.sectionTitleDark]}>Your Choices</Text>
             {choices.map((choice, index) => (
-              <View key={choice.id} style={styles.choiceItem}>
+              <View key={choice.id} style={[styles.choiceItem, actualDarkMode && styles.choiceItemDark]}>
                 <View style={styles.choiceContent}>
-                  <Text style={styles.choiceNumber}>{index + 1}.</Text>
-                  <Text style={styles.choiceText}>{choice.text}</Text>
+                  <Text style={[styles.choiceNumber, actualDarkMode && styles.choiceNumberDark]}>{index + 1}.</Text>
+                  <Text style={[styles.choiceText, actualDarkMode && styles.choiceTextDark]}>{choice.text}</Text>
                   {choice.isGood !== null && (
                     <View style={styles.statusContainer}>
                       <MaterialIcons
@@ -215,8 +334,8 @@ export default function App() {
         )}
 
         {/* Action Buttons */}
-        {choices.length >= 2 && (
-          <View style={styles.actionSection}>
+        <View style={styles.actionSection}>
+          {choices.length >= 2 && (
             <TouchableOpacity
               style={[styles.evaluateButton, isProcessing && styles.disabledButton]}
               onPress={evaluateChoices}
@@ -227,23 +346,36 @@ export default function App() {
                 {isProcessing ? 'Evaluating...' : 'Evaluate & Choose'}
               </Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.resetButton}
-              onPress={resetApp}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.resetButtonText}>Reset</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          )}
+          
+          {/* Quick Mode Button */}
+          <TouchableOpacity
+            style={[styles.quickModeButton, isProcessing && styles.disabledButton]}
+            onPress={generateQuickChoice}
+            disabled={isProcessing}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="flash-on" size={20} color="white" />
+            <Text style={styles.quickModeText}>
+              {isProcessing ? 'Generating...' : 'Quick Choice'}
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.resetButton}
+            onPress={resetApp}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.resetButtonText}>Reset</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Result Section */}
         {showResult && selectedChoice && (
-          <View style={styles.resultSection}>
-            <Text style={styles.resultTitle}>🎉 Your Choice:</Text>
-            <Text style={styles.resultText}>{selectedChoice}</Text>
-            <Text style={styles.resultSubtext}>
+          <View style={[styles.resultSection, actualDarkMode && styles.resultSectionDark]}>
+            <Text style={[styles.resultTitle, actualDarkMode && styles.resultTitleDark]}>🎉 Your Choice:</Text>
+            <Text style={[styles.resultText, actualDarkMode && styles.resultTextDark]}>{selectedChoice}</Text>
+            <Text style={[styles.resultSubtext, actualDarkMode && styles.resultSubtextDark]}>
               Selected from {choices.filter(c => c.isGood).length} good options
             </Text>
           </View>
@@ -258,12 +390,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  containerDark: {
+    flex: 1,
+    backgroundColor: '#121212',
+  },
   header: {
     backgroundColor: '#2196F3',
     paddingTop: Platform.OS === 'ios' ? 25 : 20,
     paddingBottom: 20,
     paddingHorizontal: 20,
+  },
+  headerDark: {
+    backgroundColor: '#1a1a1a',
+  },
+  headerContent: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+
+  darkModeToggle: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   title: {
     fontSize: 32,
@@ -282,6 +436,11 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
+  contentDark: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#121212',
+  },
   inputSection: {
     marginBottom: 20,
   },
@@ -290,6 +449,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 15,
     color: '#333',
+  },
+  sectionTitleDark: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 15,
+    color: '#ffffff',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -306,6 +471,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
   },
+  inputDark: {
+    flex: 1,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 16,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#444',
+    color: '#ffffff',
+  },
   addButton: {
     backgroundColor: '#4CAF50',
     borderRadius: 8,
@@ -315,6 +492,22 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     backgroundColor: '#ccc',
+  },
+  randomActivityButton: {
+    backgroundColor: '#FF9800',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  randomActivityText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   choicesSection: {
     marginBottom: 20,
@@ -329,6 +522,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#eee',
   },
+  choiceItemDark: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#444',
+  },
   choiceContent: {
     flex: 1,
     flexDirection: 'row',
@@ -341,10 +544,22 @@ const styles = StyleSheet.create({
     marginRight: 10,
     minWidth: 25,
   },
+  choiceNumberDark: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#aaa',
+    marginRight: 10,
+    minWidth: 25,
+  },
   choiceText: {
     flex: 1,
     fontSize: 16,
     color: '#333',
+  },
+  choiceTextDark: {
+    flex: 1,
+    fontSize: 16,
+    color: '#ffffff',
   },
   statusIcon: {
     marginLeft: 10,
@@ -372,6 +587,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+  quickModeButton: {
+    backgroundColor: '#FF9800',
+    borderRadius: 8,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  quickModeText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
   buttonText: {
     color: 'white',
     fontSize: 18,
@@ -397,10 +628,24 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#4CAF50',
   },
+  resultSectionDark: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
   resultTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+    marginBottom: 10,
+  },
+  resultTitleDark: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
     marginBottom: 10,
   },
   resultText: {
@@ -410,9 +655,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 10,
   },
+  resultTextDark: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#66BB6A',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
   resultSubtext: {
     fontSize: 14,
     color: '#666',
+    textAlign: 'center',
+  },
+  resultSubtextDark: {
+    fontSize: 14,
+    color: '#aaa',
     textAlign: 'center',
   },
 });
